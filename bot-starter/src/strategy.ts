@@ -2,9 +2,9 @@
 
 // Standard Scrabble letter values — useful for valuation.
 export const LETTER_VALUE: Record<string, number> = {
-  A: 1, B: 3, C: 3, D: 2, E: 1, F: 4, G: 2, H: 4, I: 1, J: 8,
-  K: 5, L: 1, M: 3, N: 1, O: 1, P: 3, Q: 10, R: 1, S: 1, T: 1,
-  U: 1, V: 4, W: 4, X: 8, Y: 4, Z: 10,
+  A: 4, B: 3, C: 3, D: 2, E: 4, F: 4, G: 2, H: 4, I: 1, J: 8,
+  K: 5, L: 1, M: 3, N: 3, O: 3, P: 3, Q: 10, R: 1, S: 3, T: 3,
+  U: 3, V: 4, W: 4, X: 8, Y: 4, Z: 10,
 };
 
 export interface BidContext {
@@ -18,11 +18,8 @@ export interface BidContext {
  * Default: bid the letter's face value plus a small premium if you don't have one yet.
  */
 export function decideBid(ctx: BidContext): number {
-  const value = LETTER_VALUE[ctx.letter] ?? 1;
-  const have = ctx.myRack.get(ctx.letter) ?? 0;
-  // Pay slightly above face value for letters you don't have yet.
-  const want = have === 0 ? value + 2 : Math.max(1, value);
-  return Math.min(want, Math.max(0, ctx.myBalance));
+  const value = (LETTER_VALUE[ctx.letter] + 2) * 10;
+  return Math.min(value, ctx.myBalance);
 }
 
 export interface WordContext {
@@ -41,13 +38,11 @@ export interface WordContext {
  * auction means bids on closed auctions and words from spent letters.
  */
 export function chooseWord(ctx: WordContext): string | null {
-  let tiles = 0;
-  for (const count of ctx.myRack.values()) tiles += count;
-
   // The dictionary is longest first, so the first word we can spell is
   // the longest.
   for (const word of ctx.dictionary) {
-    if (word.length <= tiles && canSpell(word, ctx.myRack)) return word;
+    if (canSpell(word, ctx.myRack) && (word.length >= 6 || word.length <= 3)) return word;
+    	else if (canSpell(word, ctx.myRack)) return word;
   }
   return null;
 }
