@@ -28,13 +28,30 @@ import { Identity } from "spacetimedb";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { chooseWord, decideBid } from "./strategy.js";
+import diagnosticsChannel from "node:diagnostics_channel";
+
+diagnosticsChannel
+  .channel("undici:websocket:close")
+  .subscribe(({ code, reason }) => {
+    console.error("[Titan] WebSocket close:", {
+      code,
+      reason,
+      time: new Date().toISOString(),
+    });
+  });
+
+diagnosticsChannel
+  .channel("undici:websocket:socket_error")
+  .subscribe((error) => {
+    console.error("[Titan] WebSocket socket error:", error);
+  });
 
 const HOST = process.env.STDB_HOST ?? "https://maincloud.spacetimedb.com";
 const DB_NAME = process.env.STDB_DB ?? "scrabblebot";
 const BOT_NAME = process.env.BOT_NAME ?? "Titan";
 const BOT_TOKEN = process.env.BOT_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJoZXhfaWRlbnRpdHkiOiJjMjAwZjhkZmQ0M2VjOTVjYzU4N2MyMDFmMTY1NGE5NjlmNjg4MWMzMTcwOTg5M2M2NTQ1NWY4YTZmMzg1NTc0Iiwic3ViIjoiOWU3NzE5NTMtNTkzZi00Y2Q5LThiZTgtYTUwODg3OWIwNTZkIiwiaXNzIjoibG9jYWxob3N0IiwiYXVkIjpbInNwYWNldGltZWRiIl0sImlhdCI6MTc5NDA4Njc0MH0.5d56IGlFT0Cik7Iw1Mt20jvraVzZW3KhepeqA2BTZgPQxRQNOeC_NXTBOBSYY2K7tnJFSebXihoFYDHX-EL6qA"; // from the website, first run only
 const BOT_NONCE = process.env.BOT_NONCE; // from the CLI, first run only
-const TOURNAMENT_ID = 2;
+const TOURNAMENT_ID = 3;
 const TOKEN_PATH = path.join(process.cwd(), `.token-${BOT_NAME}`);
 
 function loadToken(): string | undefined {
@@ -185,20 +202,16 @@ function onConnect(conn: DbConnection, identity: Identity, token: string) {
             .claimCredential({ code: BOT_NONCE })
             .catch(logFailure("claiming the credential"));
           // Wait briefly for the credential to land; check again.
-          setTimeout(() => {
-            myBotId = resolveMyBotId(conn);
-            if (myBotId === null) {
-              console.error(
-                `[${BOT_NAME}] couldn't claim credential. Bad / expired nonce?`,
-              );
-              process.exit(1);
-            }
-            const bot = conn.db.bot.id.find(myBotId);
-            console.log(
-              `[${BOT_NAME}] claimed credential for bot '${bot?.name ?? "?"}' (id ${myBotId})`,
-            );
-            bootstrapActivity(conn);
-          }, 1000);
+setTimeout(() => {
+  myBotId = resolveMyBotId(conn);
+
+  if (myBotId === null) {
+    console.error("couldn't claim credential");
+    process.exit(1);
+  }
+
+  bootstrapActivity(conn);
+}, 1000);
           return;
         } else {
           console.error(
@@ -272,32 +285,72 @@ function joinLobby(conn: DbConnection) {
 }
 
 function bootstrapActivity(conn: DbConnection) {
-  if (TOURNAMENT_ID) {
-    conn.reducers
-      .registerForTournament({ tournamentId: BigInt(TOURNAMENT_ID) })
-      .then(() =>
-        console.log(`[${BOT_NAME}] registered for tournament ${TOURNAMENT_ID}`),
-      )
-      .catch(logFailure(`registering for tournament ${TOURNAMENT_ID}`));
-  }
-  joinLobby(conn);
-  for (const a of conn.db.auction.iter()) {
-    if (a.status.tag === "Open") tryBid(conn, a.id, a.matchId, a.letter);
-  }
-  tryPlayWord(conn);
-}
+  console.log(
+    `[${BOT_NAME}] bootstrapActivity called`,
+    {
+      active: conn.isActive,
+      reconnecting: conn.isReconnecting,
+      tournamentId: TOURNAMENT_ID,
+      time: new Date().toISOString(),
+    }
+  );
 
+  if (TOURNAMENT_ID && conn.isActive) {
+    console.log(`[${BOT_NAME}] requesting tournament registration`);
+
+    conn.reducers
+      .registerForTournament({
+        tournamentId: BigInt(TOURNAMENT_ID),
+      })
+      .then(() => {
+        console.log(
+          `[${BOT_NAME}] registration acknowledged for tournament ${TOURNAMENT_ID}`
+        );
+      })
+      .catch((err) => {
+        console.error(
+          `[${BOT_NAME}] registration error:`,
+          err
+        );
+      });
+  }
+
+  joinLobby(conn);
+}
 function main() {
   console.log(`[${BOT_NAME}] connecting to ${DB_NAME} at ${HOST}`);
   DbConnection.builder()
     .withUri(HOST)
+.withAutomaticReconnect()
+.onAutomaticReconnect((_conn, identity) => {
+  console.log(
+    `[Titan] Reconnected: ${identity.toHexString()}`
+  );
+})
+.onConnectError((_ctx, error, attempt, delayMs) => {
+  console.error("[Titan] Connection error:", error);
+
+  if (attempt !== undefined) {
+    console.log(`Retry ${attempt} in ${delayMs}ms`);
+  }
+})
     .withDatabaseName(DB_NAME)
     .withToken(BOT_TOKEN ?? loadToken())
     .onConnect(onConnect)
     .onConnectError((_ctx: ErrorContext, err: Error) =>
       console.error("connect error:", err.message),
     )
-    .onDisconnect(() => console.log("disconnected"))
+    .onDisconnect((_ctx, error, attempt, delayMs) => {
+  console.error("[Titan] DISCONNECTED:", error);
+
+  if (attempt !== undefined) {
+    console.log(
+      `[Titan] Reconnecting: attempt ${attempt}, delay ${delayMs}ms`
+    );
+  } else {
+    console.error("[Titan] No automatic retry scheduled");
+  }
+})
     .build();
 }
 
