@@ -34,7 +34,7 @@ const DB_NAME = process.env.STDB_DB ?? "scrabblebot";
 const BOT_NAME = process.env.BOT_NAME ?? "Titan";
 const BOT_TOKEN = process.env.BOT_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJoZXhfaWRlbnRpdHkiOiJjMjAwZjhkZmQ0M2VjOTVjYzU4N2MyMDFmMTY1NGE5NjlmNjg4MWMzMTcwOTg5M2M2NTQ1NWY4YTZmMzg1NTc0Iiwic3ViIjoiOWU3NzE5NTMtNTkzZi00Y2Q5LThiZTgtYTUwODg3OWIwNTZkIiwiaXNzIjoibG9jYWxob3N0IiwiYXVkIjpbInNwYWNldGltZWRiIl0sImlhdCI6MTc5NDA4Njc0MH0.5d56IGlFT0Cik7Iw1Mt20jvraVzZW3KhepeqA2BTZgPQxRQNOeC_NXTBOBSYY2K7tnJFSebXihoFYDHX-EL6qA"; // from the website, first run only
 const BOT_NONCE = process.env.BOT_NONCE; // from the CLI, first run only
-const TOURNAMENT_ID = process.env.TOURNAMENT_ID;
+const TOURNAMENT_ID = 2;
 const TOKEN_PATH = path.join(process.cwd(), `.token-${BOT_NAME}`);
 
 function loadToken(): string | undefined {
