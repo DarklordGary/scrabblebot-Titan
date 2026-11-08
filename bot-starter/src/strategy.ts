@@ -2,9 +2,9 @@
 
 // Standard Scrabble letter values — useful for valuation.
 export const LETTER_VALUE: Record<string, number> = {
-  A: 4, B: 3, C: 3, D: 2, E: 4, F: 4, G: 2, H: 4, I: 1, J: 8,
-  K: 5, L: 1, M: 3, N: 3, O: 3, P: 3, Q: 10, R: 1, S: 3, T: 3,
-  U: 3, V: 4, W: 4, X: 8, Y: 4, Z: 10,
+  A: 4, B: 3, C: 5, D: 3, E: 4, F: 4, G: 3, H: 4, I: 2, J: 5,
+  K: 3, L: 3, M: 4, N: 4, O: 3, P: 3, Q: 10, R: 1, S: 4, T: 4,
+  U: 3, V: 2, W: 2, X: 0, Y: 1, Z: 2,
 };
 
 export interface BidContext {
